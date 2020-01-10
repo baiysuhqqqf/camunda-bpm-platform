@@ -103,6 +103,11 @@ public interface HistoricJobLog {
   String getActivityId();
 
   /**
+   * Returns the id of the activity on which the last exception occurred.
+   */
+  String getLastFailingActivityId();
+
+  /**
    * Returns the specific execution id on which the associated job was created.
    */
   String getExecutionId();

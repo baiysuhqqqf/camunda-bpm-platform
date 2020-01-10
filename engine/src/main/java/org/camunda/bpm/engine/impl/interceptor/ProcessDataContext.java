@@ -23,11 +23,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.camunda.bpm.application.ProcessApplicationReference;
 import org.camunda.bpm.engine.impl.cfg.ProcessEngineConfigurationImpl;
-import org.camunda.bpm.engine.impl.context.Context;
 import org.camunda.bpm.engine.impl.persistence.entity.ExecutionEntity;
-import org.camunda.commons.logging.MdcAccess;
 
 /**
  * Holds the contextual process data used in logging.<br>
@@ -50,50 +47,16 @@ import org.camunda.commons.logging.MdcAccess;
  * <li>loggingContextTenantId - the context property for the tenant id</li>
  * </ul>
  */
-public class ProcessDataLoggingContext extends ProcessDataContext {
+public class ProcessDataContext {
+
+  public static final String PROPERTY_ACTIVITY_ID = "activityId";
 
   private static final String NULL_VALUE = "~NULL_VALUE~";
-
-  private String propertyActivityId;
-  private String propertyApplicationName;
-  private String propertyBusinessKey;
-  private String propertyDefinitionId;
-  private String propertyInstanceId;
-  private String propertyTenantId;
-
-  private List<String> propertyNames = new ArrayList<>();
 
   private Map<String, Deque<String>> propertyValues = new HashMap<>();
 
   private boolean startNewSection = false;
   private Deque<List<String>> sections = new ArrayDeque<>();
-
-  public ProcessDataLoggingContext(ProcessEngineConfigurationImpl configuration) {
-    propertyActivityId = configuration.getLoggingContextActivityId();
-    if (isNotBlank(propertyActivityId)) {
-      propertyNames.add(propertyActivityId);
-    }
-    propertyApplicationName = configuration.getLoggingContextApplicationName();
-    if (isNotBlank(propertyApplicationName)) {
-      propertyNames.add(propertyApplicationName);
-    }
-    propertyBusinessKey = configuration.getLoggingContextBusinessKey();
-    if (isNotBlank(propertyBusinessKey)) {
-      propertyNames.add(propertyBusinessKey);
-    }
-    propertyDefinitionId = configuration.getLoggingContextProcessDefinitionId();
-    if (isNotBlank(propertyDefinitionId)) {
-      propertyNames.add(propertyDefinitionId);
-    }
-    propertyInstanceId = configuration.getLoggingContextProcessInstanceId();
-    if (isNotBlank(propertyInstanceId)) {
-      propertyNames.add(propertyInstanceId);
-    }
-    propertyTenantId = configuration.getLoggingContextTenantId();
-    if (isNotBlank(propertyTenantId)) {
-      propertyNames.add(propertyTenantId);
-    }
-  }
 
   /**
    * Start a new section that keeps track of the pushed properties and update
@@ -111,34 +74,11 @@ public class ProcessDataLoggingContext extends ProcessDataContext {
    *         and therefore should be popped later by {@link #popSection()}
    */
   public boolean pushSection(ExecutionEntity execution) {
-    if (!propertyNames.isEmpty()) {
-      if (propertyValues.isEmpty()) {
-        clearMdc();
-      }
-      startNewSection = true;
-      addToStackAndMdc(execution.getActivityId(), propertyActivityId);
-      addToStackAndMdc(execution.getProcessDefinitionId(), propertyDefinitionId);
-      addToStackAndMdc(execution.getProcessInstanceId(), propertyInstanceId);
-      addToStackAndMdc(execution.getTenantId(), propertyTenantId);
+    startNewSection = true;
+    addToStack(execution.getActivityId(), PROPERTY_ACTIVITY_ID);
 
-      if (isNotBlank(propertyApplicationName)) {
-        ProcessApplicationReference currentPa = Context.getCurrentProcessApplication();
-        if (currentPa != null) {
-          addToStackAndMdc(currentPa.getName(), propertyApplicationName);
-        }
-      }
-
-      if (isNotBlank(propertyBusinessKey)) {
-        addToStackAndMdc(execution.getBusinessKey(), propertyBusinessKey);
-      }
-
-      if (!startNewSection) {
-        // a new section was started
-        return true;
-      }
-      startNewSection = false;
-    }
-    return false;
+    // a new section was started
+    return !startNewSection;
   }
 
   /**
@@ -146,49 +86,22 @@ public class ProcessDataLoggingContext extends ProcessDataContext {
    * update the MDC accordingly
    */
   public void popSection() {
-    if (!propertyNames.isEmpty()) {
-      List<String> section = sections.pollFirst();
-      if (section != null) {
-        for (String property : section) {
-          removeFromStack(property);
-        }
+    List<String> section = sections.pollFirst();
+    if (section != null) {
+      for (String property : section) {
+        removeFromStack(property);
       }
     }
   }
 
-  /** Remove all logging context properties from the MDC */
-  public void clearMdc() {
-    for (String property : propertyNames) {
-      MdcAccess.remove(property);
-    }
-  }
-
-  /** Update the MDC with the current values of this logging context */
-  public void update() {
+  public String getLatestProperty(String property) {
     if (!propertyValues.isEmpty()) {
-      // only update MDC if this context has set anything as well
-      for (String property : propertyNames) {
-        updateMdc(property);
-      }
+      return propertyValues.get(property).peekFirst();
     }
+    return null;
   }
 
-  /** Preserve the current MDC values and store them in the logging context */
-  public void fetchCurrentContext() {
-    if (!propertyNames.isEmpty()) {
-      startNewSection = true;
-      for (String property : propertyNames) {
-        addToStack(MdcAccess.get(property), property, false);
-      }
-      startNewSection = false;
-    }
-  }
-
-  protected void addToStackAndMdc(String value, String property) {
-    addToStack(value, property, true);
-  }
-
-  protected void addToStack(String value, String property, boolean addToMdc) {
+  protected void addToStack(String value, String property) {
     if (!isNotBlank(property)) {
       return;
     }
@@ -200,14 +113,8 @@ public class ProcessDataLoggingContext extends ProcessDataContext {
     addToCurrentSection(property);
     if (value == null) {
       deque.addFirst(NULL_VALUE);
-      if (addToMdc) {
-        MdcAccess.remove(property);
-      }
     } else {
       deque.addFirst(value);
-      if (addToMdc) {
-        MdcAccess.put(property, value);
-      }
     }
   }
 
@@ -216,7 +123,6 @@ public class ProcessDataLoggingContext extends ProcessDataContext {
       return;
     }
     getDeque(property).removeFirst();
-    updateMdc(property);
   }
 
   protected Deque<String> getDeque(String property) {
@@ -236,15 +142,6 @@ public class ProcessDataLoggingContext extends ProcessDataContext {
       startNewSection = false;
     }
     section.add(property);
-  }
-
-  protected void updateMdc(String property) {
-    String previousValue = propertyValues.containsKey(property) ? propertyValues.get(property).peekFirst() : null;
-    if (isNull(previousValue)) {
-      MdcAccess.remove(property);
-    } else {
-      MdcAccess.put(property, previousValue);
-    }
   }
 
   protected static boolean isNotBlank(String property) {

@@ -89,7 +89,7 @@ public class ExecuteJobHelper {
       if (jobFailureCollector.getFailure() != null) {
         // the failed job listener is responsible for decrementing the retries and logging the exception to the DB.
 
-        FailedJobListener failedJobListener = createFailedJobListener(commandExecutor, jobFailureCollector.getFailure(), jobFailureCollector.getJobId());
+        FailedJobListener failedJobListener = createFailedJobListener(commandExecutor, jobFailureCollector);
 
         OptimisticLockingException exception = callFailedJobListenerWithRetries(commandExecutor, failedJobListener);
         if (exception != null) {
@@ -126,8 +126,8 @@ public class ExecuteJobHelper {
   }
 
 
-  protected static FailedJobListener createFailedJobListener(CommandExecutor commandExecutor, Throwable exception, String jobId) {
-    return new FailedJobListener(commandExecutor, jobId, exception);
+  protected static FailedJobListener createFailedJobListener(CommandExecutor commandExecutor, JobFailureCollector jobFailureCollector) {
+    return new FailedJobListener(commandExecutor, jobFailureCollector);
   }
 
   protected static SuccessfulJobListener createSuccessfulJobListener(CommandExecutor commandExecutor) {

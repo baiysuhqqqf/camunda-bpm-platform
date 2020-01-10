@@ -64,6 +64,7 @@ public class IncidentEntity implements Incident, DbEntity, HasDbRevision, HasDbR
   protected String tenantId;
   protected String jobDefinitionId;
   protected String historyConfiguration;
+  protected String lastFailingActivityId;
 
   public List<IncidentEntity> createRecursiveIncidents() {
     List<IncidentEntity> createdIncidents = new ArrayList<IncidentEntity>();
@@ -121,6 +122,7 @@ public class IncidentEntity implements Incident, DbEntity, HasDbRevision, HasDbR
     newIncident.setTenantId(context.getTenantId());
     newIncident.setJobDefinitionId(context.getJobDefinitionId());
     newIncident.setHistoryConfiguration(context.getHistoryConfiguration());
+    newIncident.setLastFailingActivityId(context.getLastFailingActivityId());
 
     if (context.getExecutionId() != null) {
       // fetch execution
@@ -475,6 +477,14 @@ public class IncidentEntity implements Incident, DbEntity, HasDbRevision, HasDbR
     this.historyConfiguration = historyConfiguration;
   }
 
+  public String getLastFailingActivityId() {
+    return lastFailingActivityId;
+  }
+
+  public void setLastFailingActivityId(String lastFailingActivityId) {
+    this.lastFailingActivityId = lastFailingActivityId;
+  }
+
   @Override
   public String toString() {
     return this.getClass().getSimpleName()
@@ -491,6 +501,7 @@ public class IncidentEntity implements Incident, DbEntity, HasDbRevision, HasDbR
            + ", tenantId=" + tenantId
            + ", incidentMessage=" + incidentMessage
            + ", jobDefinitionId=" + jobDefinitionId
+           + ", lastFailingActivityId=" + lastFailingActivityId
            + "]";
   }
 

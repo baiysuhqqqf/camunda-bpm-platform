@@ -1100,6 +1100,7 @@ public class DefaultHistoryEventProducer implements HistoryEventProducer {
     }
 
     evt.setActivityId(jobEntity.getActivityId());
+    evt.setLastFailingActivityId(jobEntity.getLastFailingActivityId());
     evt.setExecutionId(jobEntity.getExecutionId());
     evt.setProcessInstanceId(jobEntity.getProcessInstanceId());
     evt.setProcessDefinitionId(jobEntity.getProcessDefinitionId());

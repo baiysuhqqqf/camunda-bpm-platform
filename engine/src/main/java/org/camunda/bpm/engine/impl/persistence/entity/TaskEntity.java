@@ -35,11 +35,9 @@ import org.camunda.bpm.engine.ProcessEngine;
 import org.camunda.bpm.engine.ProcessEngineException;
 import org.camunda.bpm.engine.ProcessEngineServices;
 import org.camunda.bpm.engine.delegate.BpmnError;
-import org.camunda.bpm.engine.delegate.DelegateCaseExecution;
 import org.camunda.bpm.engine.delegate.DelegateTask;
 import org.camunda.bpm.engine.delegate.Expression;
 import org.camunda.bpm.engine.delegate.TaskListener;
-import org.camunda.bpm.engine.delegate.VariableScope;
 import org.camunda.bpm.engine.exception.NotFoundException;
 import org.camunda.bpm.engine.exception.NullValueException;
 import org.camunda.bpm.engine.history.UserOperationLogEntry;
@@ -71,7 +69,6 @@ import org.camunda.bpm.engine.impl.interceptor.CommandContextListener;
 import org.camunda.bpm.engine.impl.interceptor.CommandInvocationContext;
 import org.camunda.bpm.engine.impl.pvm.delegate.ActivityExecution;
 import org.camunda.bpm.engine.impl.pvm.runtime.PvmExecutionImpl;
-import org.camunda.bpm.engine.impl.task.TaskDecorator;
 import org.camunda.bpm.engine.impl.task.TaskDefinition;
 import org.camunda.bpm.engine.impl.task.delegate.TaskListenerInvocation;
 import org.camunda.bpm.engine.impl.util.ClockUtil;
@@ -1057,6 +1054,7 @@ public class TaskEntity extends AbstractVariableScope implements Task, DelegateT
 
   protected boolean invokeListener(String taskEventName, TaskListener taskListener) {
     boolean popLoggingContext = false;
+    boolean popProcessDataContext = false;
     CommandInvocationContext commandInvocationContext = Context.getCommandInvocationContext();
     CoreExecution execution = getExecution();
     if (execution == null) {
@@ -1064,6 +1062,7 @@ public class TaskEntity extends AbstractVariableScope implements Task, DelegateT
     } else {
       if (commandInvocationContext != null) {
         popLoggingContext = commandInvocationContext.getLoggingContext().pushSection((ExecutionEntity) execution);
+        popProcessDataContext = commandInvocationContext.getProcessDataContext().pushSection((ExecutionEntity) execution);
       }
     }
     if (execution != null) {
@@ -1073,6 +1072,9 @@ public class TaskEntity extends AbstractVariableScope implements Task, DelegateT
       boolean result = invokeListener(execution, taskEventName, taskListener);
       if (popLoggingContext) {
         commandInvocationContext.getLoggingContext().popSection();
+      }
+      if (popProcessDataContext) {
+        commandInvocationContext.getProcessDataContext().popSection();
       }
       return result;
     } catch (Exception e) {
