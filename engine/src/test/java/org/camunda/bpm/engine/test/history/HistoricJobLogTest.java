@@ -188,7 +188,7 @@ public class HistoricJobLogTest {
     assertThat(historicJob.getJobExceptionMessage()).isEqualTo(FailingDelegate.EXCEPTION_MESSAGE);
     assertThat(historicJob.getJobPriority()).isEqualTo(job.getPriority());
     assertThat(historicJob.getHostname()).containsIgnoringCase(CUSTOM_HOSTNAME);
-    assertThat(historicJob.getLastFailingActivityId()).isEqualTo(job.getLastFailingActivityId());
+    assertThat(historicJob.getLastFailingActivityId()).isNotNull().isEqualTo(job.getLastFailingActivityId());
 
     assertThat(historicJob.isCreationLog()).isFalse();
     assertThat(historicJob.isFailureLog()).isTrue();

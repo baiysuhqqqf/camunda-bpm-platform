@@ -142,7 +142,7 @@ public interface HistoricJobLog {
    * Returns the id of the tenant this job log entry belongs to. Can be <code>null</code>
    * if the job log entry belongs to no single tenant.
    */
-  public String getTenantId();
+  String getTenantId();
 
   /**
    * Returns the name of the host where the Process Engine that added this job log runs.

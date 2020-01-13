@@ -34,6 +34,8 @@ import org.camunda.bpm.engine.runtime.Job;
 import org.camunda.bpm.engine.runtime.JobQuery;
 import org.camunda.bpm.engine.runtime.ProcessInstance;
 import org.camunda.bpm.engine.test.Deployment;
+import org.camunda.bpm.engine.test.api.runtime.util.ChangeVariablesDelegate;
+import org.camunda.bpm.engine.variable.Variables;
 import org.camunda.bpm.model.bpmn.Bpmn;
 
 public class IncidentTest extends PluggableProcessEngineTestCase {
@@ -503,6 +505,60 @@ public class IncidentTest extends PluggableProcessEngineTestCase {
     assertEquals("theStart", incident.getActivityId());
     assertNull(incident.getProcessInstanceId());
     assertNull(incident.getExecutionId());
+  }
+
+  public void testShouldShowFailingActivityIdPropertyForFailingAsyncTask() {
+    // given
+    deployment(Bpmn.createExecutableProcess("process")
+      .startEvent()
+      .serviceTask("theTask")
+        .camundaAsyncBefore()
+        .camundaClass(FailingDelegate.class)
+      .endEvent()
+      .done());
+
+    runtimeService.startProcessInstanceByKey("process", Variables.createVariables().putValue("fail", true));
+
+    // when
+    executeAvailableJobs();
+
+    // then
+    Incident incident = runtimeService
+       .createIncidentQuery()
+       .singleResult();
+
+     assertNotNull(incident);
+
+     assertNotNull(incident.getLastFailingActivityId());
+     assertEquals("theTask", incident.getLastFailingActivityId());
+  }
+
+  public void testShouldShowFailingActivityIdPropertyForAsyncTaskWithFailingFollowUp() {
+    // given
+    deployment(Bpmn.createExecutableProcess("process")
+        .startEvent()
+        .serviceTask("theTask")
+          .camundaAsyncBefore()
+          .camundaClass(ChangeVariablesDelegate.class)
+        .serviceTask("theTask2").camundaClass(ChangeVariablesDelegate.class)
+        .serviceTask("theTask3").camundaClass(FailingDelegate.class)
+        .endEvent()
+        .done());
+
+    runtimeService.startProcessInstanceByKey("process", Variables.createVariables().putValue("fail", true));
+
+    // when
+    executeAvailableJobs();
+
+    // then
+    Incident incident = runtimeService
+       .createIncidentQuery()
+       .singleResult();
+
+     assertNotNull(incident);
+
+     assertNotNull(incident.getLastFailingActivityId());
+     assertEquals("theTask3", incident.getLastFailingActivityId());
   }
 
   public void testBoundaryEventIncidentActivityId() {
