@@ -122,7 +122,7 @@ public class ProcessDataContext {
       clearMdc();
     }
     startNewSection = true;
-    addToStack(execution.getActivityId(), PROPERTY_ACTIVITY_ID);
+    addToStack(execution.getActivityId(), PROPERTY_ACTIVITY_ID, mdcPropertyActivityId != null);
     addToStack(execution.getProcessDefinitionId(), mdcPropertyDefinitionId);
     addToStack(execution.getProcessInstanceId(), mdcPropertyInstanceId);
     addToStack(execution.getTenantId(), mdcPropertyTenantId);
