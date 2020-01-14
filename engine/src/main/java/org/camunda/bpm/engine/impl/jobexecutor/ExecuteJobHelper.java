@@ -22,7 +22,7 @@ import org.camunda.bpm.engine.impl.cfg.ProcessEngineConfigurationImpl;
 import org.camunda.bpm.engine.impl.cmd.ExecuteJobsCmd;
 import org.camunda.bpm.engine.impl.interceptor.Command;
 import org.camunda.bpm.engine.impl.interceptor.CommandExecutor;
-import org.camunda.bpm.engine.impl.interceptor.ProcessDataLoggingContext;
+import org.camunda.bpm.engine.impl.interceptor.ProcessDataContext;
 
 public class ExecuteJobHelper {
 
@@ -65,9 +65,9 @@ public class ExecuteJobHelper {
       throw LOG.wrapJobExecutionFailure(jobFailureCollector, exception);
     } finally {
       // preserve MDC properties before listener invocation and clear MDC for job listener
-      ProcessDataLoggingContext loggingContext = null;
+      ProcessDataContext loggingContext = null;
       if (configuration != null) {
-        loggingContext = new ProcessDataLoggingContext(configuration);
+        loggingContext = new ProcessDataContext(configuration);
         loggingContext.fetchCurrentContext();
         loggingContext.clearMdc();
       }
@@ -79,7 +79,7 @@ public class ExecuteJobHelper {
        * of the listener is preserved and used from here on
        */
       if (loggingContext != null) {
-        loggingContext.update();
+        loggingContext.updateMdc();
       }
     }
   }

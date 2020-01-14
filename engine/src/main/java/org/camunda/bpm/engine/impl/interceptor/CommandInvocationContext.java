@@ -48,13 +48,11 @@ public class CommandInvocationContext {
   protected boolean isExecuting = false;
   protected List<AtomicOperationInvocation> queuedInvocations = new ArrayList<AtomicOperationInvocation>();
   protected BpmnStackTrace bpmnStackTrace = new BpmnStackTrace();
-  protected ProcessDataLoggingContext loggingContext;
   protected ProcessDataContext processDataContext;
 
   public CommandInvocationContext(Command<?> command, ProcessEngineConfigurationImpl configuration) {
     this.command = command;
-    this.loggingContext = new ProcessDataLoggingContext(configuration);
-    this.processDataContext = new ProcessDataContext();
+    this.processDataContext = new ProcessDataContext(configuration);
   }
 
   public Throwable getThrowable() {
@@ -130,7 +128,7 @@ public class CommandInvocationContext {
   protected void invokeNext() {
     AtomicOperationInvocation invocation = queuedInvocations.remove(0);
     try {
-      invocation.execute(bpmnStackTrace, loggingContext, processDataContext);
+      invocation.execute(bpmnStackTrace, processDataContext);
     } catch(RuntimeException e) {
       // log bpmn stacktrace
       bpmnStackTrace.printStackTrace(Context.getProcessEngineConfiguration().isBpmnStacktraceVerbose());
@@ -159,10 +157,6 @@ public class CommandInvocationContext {
         throw new ProcessEngineException("exception while executing command " + command, throwable);
       }
     }
-  }
-
-  public ProcessDataLoggingContext getLoggingContext() {
-    return loggingContext;
   }
 
   public ProcessDataContext getProcessDataContext() {

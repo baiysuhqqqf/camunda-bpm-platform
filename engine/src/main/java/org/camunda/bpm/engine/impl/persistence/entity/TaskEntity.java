@@ -1053,7 +1053,6 @@ public class TaskEntity extends AbstractVariableScope implements Task, DelegateT
   }
 
   protected boolean invokeListener(String taskEventName, TaskListener taskListener) {
-    boolean popLoggingContext = false;
     boolean popProcessDataContext = false;
     CommandInvocationContext commandInvocationContext = Context.getCommandInvocationContext();
     CoreExecution execution = getExecution();
@@ -1061,7 +1060,6 @@ public class TaskEntity extends AbstractVariableScope implements Task, DelegateT
       execution = getCaseExecution();
     } else {
       if (commandInvocationContext != null) {
-        popLoggingContext = commandInvocationContext.getLoggingContext().pushSection((ExecutionEntity) execution);
         popProcessDataContext = commandInvocationContext.getProcessDataContext().pushSection((ExecutionEntity) execution);
       }
     }
@@ -1070,9 +1068,6 @@ public class TaskEntity extends AbstractVariableScope implements Task, DelegateT
     }
     try {
       boolean result = invokeListener(execution, taskEventName, taskListener);
-      if (popLoggingContext) {
-        commandInvocationContext.getLoggingContext().popSection();
-      }
       if (popProcessDataContext) {
         commandInvocationContext.getProcessDataContext().popSection();
       }
