@@ -16,12 +16,9 @@
  */
 package org.camunda.bpm.engine.impl.interceptor;
 
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 import org.camunda.bpm.application.ProcessApplicationReference;
 import org.camunda.bpm.engine.impl.cfg.ProcessEngineConfigurationImpl;
@@ -52,7 +49,7 @@ import org.camunda.commons.logging.MdcAccess;
  */
 public class ProcessDataLoggingContext extends ProcessDataContext {
 
-  private static final String NULL_VALUE = "~NULL_VALUE~";
+  private final StackValuePushHandler mdcStackValuePushHandler;
 
   private String propertyActivityId;
   private String propertyApplicationName;
@@ -62,11 +59,6 @@ public class ProcessDataLoggingContext extends ProcessDataContext {
   private String propertyTenantId;
 
   private List<String> propertyNames = new ArrayList<>();
-
-  private Map<String, Deque<String>> propertyValues = new HashMap<>();
-
-  private boolean startNewSection = false;
-  private Deque<List<String>> sections = new ArrayDeque<>();
 
   public ProcessDataLoggingContext(ProcessEngineConfigurationImpl configuration) {
     propertyActivityId = configuration.getLoggingContextActivityId();
@@ -93,6 +85,7 @@ public class ProcessDataLoggingContext extends ProcessDataContext {
     if (isNotBlank(propertyTenantId)) {
       propertyNames.add(propertyTenantId);
     }
+    mdcStackValuePushHandler = new MdcStackValuePushHandler(this);
   }
 
   /**
@@ -116,20 +109,20 @@ public class ProcessDataLoggingContext extends ProcessDataContext {
         clearMdc();
       }
       startNewSection = true;
-      addToStackAndMdc(execution.getActivityId(), propertyActivityId);
-      addToStackAndMdc(execution.getProcessDefinitionId(), propertyDefinitionId);
-      addToStackAndMdc(execution.getProcessInstanceId(), propertyInstanceId);
-      addToStackAndMdc(execution.getTenantId(), propertyTenantId);
+      addToStack(execution.getActivityId(), propertyActivityId);
+      addToStack(execution.getProcessDefinitionId(), propertyDefinitionId);
+      addToStack(execution.getProcessInstanceId(), propertyInstanceId);
+      addToStack(execution.getTenantId(), propertyTenantId);
 
       if (isNotBlank(propertyApplicationName)) {
         ProcessApplicationReference currentPa = Context.getCurrentProcessApplication();
         if (currentPa != null) {
-          addToStackAndMdc(currentPa.getName(), propertyApplicationName);
+          addToStack(currentPa.getName(), propertyApplicationName);
         }
       }
 
       if (isNotBlank(propertyBusinessKey)) {
-        addToStackAndMdc(execution.getBusinessKey(), propertyBusinessKey);
+        addToStack(execution.getBusinessKey(), propertyBusinessKey);
       }
 
       if (!startNewSection) {
@@ -147,12 +140,7 @@ public class ProcessDataLoggingContext extends ProcessDataContext {
    */
   public void popSection() {
     if (!propertyNames.isEmpty()) {
-      List<String> section = sections.pollFirst();
-      if (section != null) {
-        for (String property : section) {
-          removeFromStack(property);
-        }
-      }
+      super.popSection();
     }
   }
 
@@ -178,64 +166,15 @@ public class ProcessDataLoggingContext extends ProcessDataContext {
     if (!propertyNames.isEmpty()) {
       startNewSection = true;
       for (String property : propertyNames) {
-        addToStack(MdcAccess.get(property), property, false);
+        addToStack(MdcAccess.get(property), property, stackValuePushHandler);
       }
       startNewSection = false;
-    }
-  }
-
-  protected void addToStackAndMdc(String value, String property) {
-    addToStack(value, property, true);
-  }
-
-  protected void addToStack(String value, String property, boolean addToMdc) {
-    if (!isNotBlank(property)) {
-      return;
-    }
-    Deque<String> deque = getDeque(property);
-    String current = deque.peekFirst();
-    if (valuesEqual(current, value)) {
-      return;
-    }
-    addToCurrentSection(property);
-    if (value == null) {
-      deque.addFirst(NULL_VALUE);
-      if (addToMdc) {
-        MdcAccess.remove(property);
-      }
-    } else {
-      deque.addFirst(value);
-      if (addToMdc) {
-        MdcAccess.put(property, value);
-      }
     }
   }
 
   protected void removeFromStack(String property) {
-    if (property == null) {
-      return;
-    }
-    getDeque(property).removeFirst();
+    super.removeFromStack(property);
     updateMdc(property);
-  }
-
-  protected Deque<String> getDeque(String property) {
-    Deque<String> deque = propertyValues.get(property);
-    if (deque == null) {
-      deque = new ArrayDeque<>();
-      propertyValues.put(property, deque);
-    }
-    return deque;
-  }
-
-  protected void addToCurrentSection(String property) {
-    List<String> section = sections.peekFirst();
-    if (startNewSection) {
-      section = new ArrayList<>();
-      sections.addFirst(section);
-      startNewSection = false;
-    }
-    section.add(property);
   }
 
   protected void updateMdc(String property) {
@@ -247,19 +186,26 @@ public class ProcessDataLoggingContext extends ProcessDataContext {
     }
   }
 
-  protected static boolean isNotBlank(String property) {
-    return property != null && !property.trim().isEmpty();
+  private void addToStack(String value, String property) {
+    addToStack(value, property, mdcStackValuePushHandler);
   }
 
-  protected static boolean valuesEqual(String val1, String val2) {
-    if (isNull(val1)) {
-      return val2 == null;
+  public static class MdcStackValuePushHandler extends StackValuePushHandler {
+
+    public MdcStackValuePushHandler(ProcessDataContext context) {
+      super(context);
     }
-    return val1.equals(val2);
-  }
 
-  protected static boolean isNull(String value) {
-    return value == null || NULL_VALUE.equals(value);
-  }
+    @Override
+    public void nullValueAdded(Deque<String> deque, String property) {
+      super.nullValueAdded(deque, property);
+      MdcAccess.remove(property);
+    }
 
+    @Override
+    public void valueAdded(Deque<String> deque, String property, String value) {
+      super.valueAdded(deque, property, value);
+      MdcAccess.put(property, value);
+    }
+  }
 }

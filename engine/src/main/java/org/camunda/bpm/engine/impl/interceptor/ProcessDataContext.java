@@ -23,67 +23,54 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.camunda.bpm.engine.impl.cfg.ProcessEngineConfigurationImpl;
 import org.camunda.bpm.engine.impl.persistence.entity.ExecutionEntity;
 
 /**
- * Holds the contextual process data used in logging.<br>
+ * Holds the contextual process data.<br>
  *
  * New context properties are always part of a section that can be started by
  * {@link #pushSection(ExecutionEntity)}. The section keeps track of all pushed
  * properties. Those can easily be cleared by popping the section with
  * {@link #popSection()} afterwards, e.g. after the successful execution.<br>
  *
- * A property is only pushed to the logging context if there is a configured
- * non-empty context name for it in the {@link ProcessEngineConfigurationImpl
- * process engine configuration}. The following configuration options are
- * available:
- * <ul>
- * <li>loggingContextActivityId - the context property for the activity id</li>
- * <li>loggingContextApplicationName - the context property for the application name</li>
- * <li>loggingContextBusinessKey - the context property for the business key</li>
- * <li>loggingContextDefinitionId - the context property for the definition id</li>
- * <li>loggingContextProcessInstanceId - the context property for the instance id</li>
- * <li>loggingContextTenantId - the context property for the tenant id</li>
  * </ul>
  */
 public class ProcessDataContext {
 
   public static final String PROPERTY_ACTIVITY_ID = "activityId";
 
-  private static final String NULL_VALUE = "~NULL_VALUE~";
+  protected static final String NULL_VALUE = "~NULL_VALUE~";
 
-  private Map<String, Deque<String>> propertyValues = new HashMap<>();
+  protected Map<String, Deque<String>> propertyValues = new HashMap<>();
 
-  private boolean startNewSection = false;
-  private Deque<List<String>> sections = new ArrayDeque<>();
+  protected boolean startNewSection = false;
+  protected Deque<List<String>> sections = new ArrayDeque<>();
+
+  protected final StackValuePushHandler stackValuePushHandler;
+
+  public ProcessDataContext() {
+    this.stackValuePushHandler = new StackValuePushHandler(this);
+  }
 
   /**
-   * Start a new section that keeps track of the pushed properties and update
-   * the MDC. This also includes clearing the MDC for the first section that is
-   * pushed for the logging context so that only the current properties will be
-   * present in the MDC (might be less than previously present in the MDC). The
-   * previous logging context needs to be reset in the MDC when this one is
-   * closed. This can be achieved by using {@link #updateMdc(String)} with the
-   * previous logging context.
+   * Start a new section that keeps track of the pushed properties
    *
    * @param execution
    *          the execution to retrieve the logging context data from
    *
-   * @return <code>true</code> if the section contains any updates for the MDC
-   *         and therefore should be popped later by {@link #popSection()}
+   * @return <code>true</code> if the section contains any updates and therefore
+   *         should be popped later by {@link #popSection()}
    */
   public boolean pushSection(ExecutionEntity execution) {
     startNewSection = true;
-    addToStack(execution.getActivityId(), PROPERTY_ACTIVITY_ID);
+    addToStack(execution.getActivityId(), PROPERTY_ACTIVITY_ID, stackValuePushHandler);
 
     // a new section was started
     return !startNewSection;
   }
 
   /**
-   * Pop the latest section, remove all pushed properties of that section and
-   * update the MDC accordingly
+   * Pop the latest section and remove all pushed properties of that section
    */
   public void popSection() {
     List<String> section = sections.pollFirst();
@@ -94,14 +81,23 @@ public class ProcessDataContext {
     }
   }
 
-  public String getLatestProperty(String property) {
+  /**
+   * @param property
+   *          the property to retrieve the latest value for
+   * @return the latest value of the property if there is one, <code>null</code>
+   *         otherwise
+   */
+  public String getLatestPropertyValue(String property) {
     if (!propertyValues.isEmpty()) {
-      return propertyValues.get(property).peekFirst();
+      Deque<String> deque = propertyValues.get(property);
+      if (deque != null) {
+        return deque.peekFirst();
+      }
     }
     return null;
   }
 
-  protected void addToStack(String value, String property) {
+  protected void addToStack(String value, String property, StackValuePushHandler stackValuePushHandler) {
     if (!isNotBlank(property)) {
       return;
     }
@@ -112,9 +108,9 @@ public class ProcessDataContext {
     }
     addToCurrentSection(property);
     if (value == null) {
-      deque.addFirst(NULL_VALUE);
+      stackValuePushHandler.nullValueAdded(deque, property);
     } else {
-      deque.addFirst(value);
+      stackValuePushHandler.valueAdded(deque, property, value);
     }
   }
 
@@ -159,4 +155,20 @@ public class ProcessDataContext {
     return value == null || NULL_VALUE.equals(value);
   }
 
+  public static class StackValuePushHandler {
+
+    protected ProcessDataContext context;
+
+    public StackValuePushHandler(ProcessDataContext context) {
+      this.context = context;
+    }
+
+    public void nullValueAdded(Deque<String> deque, String property) {
+      deque.addFirst(NULL_VALUE);
+    }
+
+    public void valueAdded(Deque<String> deque, String property, String value) {
+      deque.addFirst(value);
+    }
+  }
 }
